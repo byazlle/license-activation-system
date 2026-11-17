@@ -74,7 +74,11 @@ class SoftwareService
     public static function privateB($software)
     {
         $path = Config::root() . '/keys/' . basename($software['private_b_path']);
-        return is_file($path) ? file_get_contents($path) : '';
+        if (!is_file($path) || !is_readable($path)) {
+            return '';
+        }
+        $pem = @file_get_contents($path);
+        return $pem === false ? '' : $pem;
     }
 
     /**
@@ -84,7 +88,11 @@ class SoftwareService
     public static function privateA()
     {
         $path = Config::root() . '/keys/private_a.pem';
-        return is_file($path) ? file_get_contents($path) : '';
+        if (!is_file($path) || !is_readable($path)) {
+            return '';
+        }
+        $pem = @file_get_contents($path);
+        return $pem === false ? '' : $pem;
     }
 
     /**
@@ -94,6 +102,10 @@ class SoftwareService
     public static function publicA()
     {
         $path = Config::root() . '/keys/public_a.pem';
-        return is_file($path) ? file_get_contents($path) : '';
+        if (!is_file($path) || !is_readable($path)) {
+            return '';
+        }
+        $pem = @file_get_contents($path);
+        return $pem === false ? '' : $pem;
     }
 }
