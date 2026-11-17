@@ -179,7 +179,7 @@ curl -s -X POST http://43.128.228.157/openapi/keys/create \
 | `system/license-url-get` | 读取 K 码内写入的授权服务器地址 |
 | `system/license-url-set` | 修改地址（`url`）；已有 K 码需再调用 `card/convert-kcode` |
 
-### 3.6 管理员账号
+### 3.5 管理员账号
 
 | 路径 | 说明 | 主要参数 |
 |---|---|---|
@@ -189,7 +189,7 @@ curl -s -X POST http://43.128.228.157/openapi/keys/create \
 | `admin/status` | 启用/停用（ID=1 禁止停用） | `id`, `status` |
 | `admin/reset-password` | 重置密码 | `id`, `password` |
 
-### 3.5 授权接口联调
+### 3.6 授权接口联调
 
 | 路径 | 说明 | 必需参数 |
 |---|---|---|
