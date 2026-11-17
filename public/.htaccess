@@ -1,0 +1,10 @@
+# Apache 虚拟主机配置
+RewriteEngine On
+
+# 目录列表关闭
+Options -Indexes
+
+# 所有请求交给入口文件（若主机不支持可改用 index.php?r= 形式）
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
