@@ -8,6 +8,21 @@ namespace App\Core;
 class Response
 {
     /**
+     * 输出跨域头（仅客户端 API 使用）
+     * 客户端 API 不使用 Cookie 鉴权，因此允许任意来源；后台页面是同源访问，无需该头。
+     */
+    public static function cors()
+    {
+        if (headers_sent()) {
+            return;
+        }
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+        header('Access-Control-Max-Age: 86400');
+    }
+
+    /**
      * 输出 JSON 响应并终止
      * @param int $code 错误码，0 表示成功
      * @param string $msg 提示信息
@@ -22,7 +37,8 @@ class Response
             'code' => $code,
             'msg' => $msg,
             'request_id' => self::requestId(),
-            'data' => $data,
+            // 空数组会被编码成 []，这里统一成 {}，让客户端始终按对象处理 data
+            'data' => (is_array($data) && count($data) === 0) ? new \stdClass() : $data,
         );
         echo json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
