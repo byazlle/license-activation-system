@@ -19,10 +19,9 @@ foreach ($required as $ext) {
 out('--- 加密往返测试 ---');
 if (extension_loaded('openssl')) {
     require_once dirname(__DIR__) . '/app/Core/Crypto.php';
-    use App\Core\Crypto;
 
     try {
-        $pair = Crypto::generateKeyPair();
+        $pair = \App\Core\Crypto::generateKeyPair();
         out('RSA 2048 密钥对生成: [OK]');
 
         $payload = array(
@@ -31,10 +30,10 @@ if (extension_loaded('openssl')) {
             'u' => 'http://example.com/api',
             'b' => substr($pair['public'], 0, 40) . '...',
         );
-        $sealed = Crypto::sealJson($payload, $pair['private']);
+        $sealed = \App\Core\Crypto::sealJson($payload, $pair['private']);
         out('私钥加密（seal）: [OK] 密文长度 ' . strlen($sealed));
 
-        $opened = Crypto::openJson($sealed, $pair['public']);
+        $opened = \App\Core\Crypto::openJson($sealed, $pair['public']);
         out('公钥解密（open）: ' . ($opened && $opened['c'] === 'CARD-TEST-0001' ? '[OK]' : '[失败]'));
 
         // GCM 支持情况
@@ -42,7 +41,7 @@ if (extension_loaded('openssl')) {
 
         // 篡改检测
         $tampered = substr($sealed, 0, -4) . 'AAAA';
-        $bad = Crypto::openJson($tampered, $pair['public']);
+        $bad = \App\Core\Crypto::openJson($tampered, $pair['public']);
         out('篡改密文解密: ' . ($bad === null ? '[正确拒绝]' : '[异常：未拒绝]'));
     } catch (\Exception $e) {
         out('加密测试异常: ' . $e->getMessage());
