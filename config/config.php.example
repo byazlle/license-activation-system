@@ -1,0 +1,22 @@
+<?php
+/**
+ * 系统配置示例
+ * 安装程序会自动生成 config/config.php；此文件仅作参考。
+ * 不要把私钥内容写进本文件，私钥位于 keys/ 目录。
+ */
+return array(
+    'db' => array(
+        'host'    => '127.0.0.1',
+        'port'    => '3306',
+        'name'    => 'license_db',
+        'user'    => 'license_user',
+        'pass'    => 'change-me',
+        'charset' => 'utf8mb4',
+        'prefix'  => 'lc_',
+    ),
+    'app' => array(
+        'name'           => '软件激活与授权管理系统',
+        'ticket_ttl'     => 1800, // 次数型票据有效期（秒），兼作失败退次窗口
+        'request_window' => 300,  // 客户端请求时间戳允许偏差（秒）
+    ),
+);
