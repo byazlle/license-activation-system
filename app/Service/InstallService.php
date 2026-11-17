@@ -80,7 +80,15 @@ class InstallService
                 array('installed_at', (string)time(), '安装时间')
             );
 
-            // 6. 写安装锁
+            // 6. 生成初始全权限 API 密钥，明文写入 Web 根之外的安装目录
+            $created = \App\Service\ApiKeyService::create('初始密钥（安装自动生成）', array('*'), 0, 1);
+            file_put_contents(
+                \App\Core\Config::root() . '/install/initial_api_key.txt',
+                "API 密钥（明文仅此一份，请妥善保存）\n" . $created['key'] . "\n",
+                0600
+            );
+
+            // 7. 写安装锁
             file_put_contents(\App\Core\Config::root() . '/install/install.lock', date('Y-m-d H:i:s'));
 
             return array('ok' => true, 'msg' => '安装完成');

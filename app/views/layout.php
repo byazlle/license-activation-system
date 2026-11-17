@@ -10,6 +10,7 @@ $nav = array(
     '卡密管理' => array('card/index', 'key'),
     '请求日志' => array('log/requests', 'list'),
     '数据统计' => array('log/stats', 'chart'),
+    'API 密钥' => array('admin/apiKeys', 'api'),
     '地址转换' => array('convert/index', 'swap'),
 );
 ?>
@@ -42,6 +43,8 @@ $nav = array(
                             <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
                         <?php elseif ($item[1] === 'chart'): ?>
                             <path d="M3 3v18h18M7 15l4-5 4 3 5-7"/>
+                        <?php elseif ($item[1] === 'api'): ?>
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21H5a2 2 0 0 1-2-2v-3m18 0v3a2 2 0 0 1-2 2h-3M9 9h6v6H9z"/>
                         <?php else: ?>
                             <path d="M7 7h14l-3-3m3 3l-3 3M17 17H3l3-3m-3 3l3 3"/>
                         <?php endif; ?>

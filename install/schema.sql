@@ -122,3 +122,34 @@ CREATE TABLE `{{PREFIX}}settings` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_skey` (`skey`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统设置表';
+
+CREATE TABLE `{{PREFIX}}api_keys` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(128) NOT NULL COMMENT '密钥名称',
+  `key_prefix` VARCHAR(16) NOT NULL COMMENT '明文前 12 位，便于识别',
+  `key_hash` CHAR(64) NOT NULL COMMENT 'SHA256 哈希',
+  `scopes` TEXT NULL COMMENT '权限范围 JSON 数组，* 表示全部',
+  `status` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1启用 0撤销',
+  `expires_at` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0永不过期',
+  `last_used_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  `last_used_ip` VARCHAR(45) DEFAULT NULL,
+  `created_by` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_key_hash` (`key_hash`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='API 密钥表';
+
+CREATE TABLE `{{PREFIX}}api_call_logs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `key_id` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `key_prefix` VARCHAR(16) DEFAULT NULL,
+  `endpoint` VARCHAR(128) DEFAULT NULL,
+  `ip` VARCHAR(45) DEFAULT NULL,
+  `code` INT UNSIGNED NOT NULL DEFAULT 0,
+  `cost_ms` INT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_key_time` (`key_id`,`created_at`),
+  KEY `idx_time` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开放 API 调用日志';

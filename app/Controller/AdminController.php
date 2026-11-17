@@ -116,4 +116,68 @@ class AdminController
         LogRepo::admin(Auth::id(), Auth::name(), 'admin.delete', (string)$id, null);
         Response::json(0, '已删除');
     }
+
+    /**
+     * API 密钥管理页
+     */
+    public function apiKeys()
+    {
+        Auth::requireSuper();
+        View::page('admin/api-keys', array(
+            'list' => \App\Repository\ApiKeyRepo::all(),
+            'calls' => \App\Repository\ApiKeyRepo::callLogs(50),
+            'scopes' => \App\Service\ApiKeyService::ALL_SCOPES,
+            'csrf' => Auth::csrfToken(),
+        ), 'API 密钥');
+    }
+
+    /**
+     * 创建 API 密钥（AJAX），明文只返回一次
+     */
+    public function apiKeyCreate()
+    {
+        Auth::requireSuper();
+        if (!Auth::checkCsrf(Util::param('csrf', ''))) {
+            Response::json(1001, '表单已过期');
+        }
+        $scopes = Util::param('scopes', array());
+        if (!is_array($scopes)) {
+            $scopes = array_filter(array_map('trim', explode(',', (string)$scopes)));
+        }
+        try {
+            $created = \App\Service\ApiKeyService::create(
+                Util::param('name', ''),
+                $scopes,
+                (int)Util::param('days', 0),
+                Auth::id()
+            );
+        } catch (\Exception $e) {
+            Response::json(1001, $e->getMessage());
+        }
+        LogRepo::admin(Auth::id(), Auth::name(), 'api_key.create',
+            $created['row']['key_prefix'], array('scopes' => $created['row']['scopes']));
+        Response::json(0, '密钥已创建', array(
+            'id' => $created['row']['id'],
+            'key' => $created['key'],
+        ));
+    }
+
+    /**
+     * 撤销 API 密钥（AJAX）
+     */
+    public function apiKeyRevoke()
+    {
+        Auth::requireSuper();
+        if (!Auth::checkCsrf(Util::param('csrf', ''))) {
+            Response::json(1001, '表单已过期');
+        }
+        $id = (int)Util::param('id', 0);
+        $row = \App\Repository\ApiKeyRepo::find($id);
+        if (!$row) {
+            Response::json(2001, '密钥不存在');
+        }
+        \App\Repository\ApiKeyRepo::revoke($id);
+        LogRepo::admin(Auth::id(), Auth::name(), 'api_key.revoke', $row['key_prefix'], null);
+        Response::json(0, '已撤销');
+    }
 }

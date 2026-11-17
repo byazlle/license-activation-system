@@ -66,6 +66,8 @@ class CardService
                     'remark' => isset($p['remark']) && $p['remark'] !== '' ? $p['remark'] : null,
                     'custom_config' => isset($p['custom_config']) && $p['custom_config'] !== '' ? $p['custom_config'] : null,
                     'batch_no' => $batch,
+                    'created_at' => time(),
+                    'updated_at' => time(),
                 ));
 
                 // 组装第一层 K 码载荷：card_id + 地址 + 该软件公钥 B_i + 校验串
