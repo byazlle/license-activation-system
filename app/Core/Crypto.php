@@ -14,11 +14,19 @@ namespace App\Core;
  * 之所以不直接用 RSA 加密数据：2048 位 RSA 在 PKCS#1 v1.5 填充下
  * 单次最多加密 245 字节，业务包含 API Key/JSON，常超过该长度。
  *
- * 二进制布局（拼接后整体 base64url）：
- *   [2字节长度][RSA加密的AES密钥][12字节IV][16字节GCM标签][AES密文]
+ * 二进制布局（变长、带长度前缀，拼接后整体 base64url）：
+ *
+ *   [1B 算法][2B 大端 密钥段长度][RSA 加密的 AES 密钥]
+ *   [1B IV 长度][IV][1B 标签长度][标签][AES 密文]
+ *
+ *   - 算法 1 = AES-256-GCM，IV 12B，标签 16B（GCM 认证标签）
+ *   - 算法 2 = AES-256-CBC，IV 16B，标签 32B（HMAC-SHA256(iv||密文)）
+ *
+ * 客户端必须按长度字段逐段解析，不能假设固定偏移：RSA 段长度随密钥
+ * 位数变化（2048 位 = 256 字节，3072 位 = 384 字节）。
  *
  * 兼容：PHP 7.2 openssl 扩展；aes-256-gcm 在少数老版本不可用时，
- * 自动降级为 aes-256-cbc + 前置 IV（详见 encryptRaw/decryptRaw）。
+ * 自动降级为 aes-256-cbc + HMAC-SHA256（仍具备完整性校验）。
  */
 class Crypto
 {
@@ -64,17 +72,17 @@ class Crypto
         $aesKey = random_bytes(self::KEY_LEN);
         $iv = random_bytes(self::IV_LEN);
 
-        // 2. AES-GCM 加密数据（不可用时降级 CBC）
+        // 2. AES-GCM 加密数据（不可用时降级 CBC + HMAC）
         $tag = '';
         if (in_array(self::AES_METHOD, openssl_get_cipher_methods(), true)) {
             $cipher = openssl_encrypt($data, self::AES_METHOD, $aesKey, OPENSSL_RAW_DATA, $iv, $tag);
             $algo = 1; // GCM
         } else {
-            // 降级：CBC，IV 取 16 字节
+            // 降级：CBC，IV 取 16 字节，完整性用 HMAC-SHA256(iv||密文) 保证
             $iv = random_bytes(16);
             $cipher = openssl_encrypt($data, 'aes-256-cbc', $aesKey, OPENSSL_RAW_DATA, $iv);
-            $tag = '';
-            $algo = 2; // CBC
+            $tag = ($cipher === false) ? '' : hash_hmac('sha256', $iv . $cipher, $aesKey, true);
+            $algo = 2; // CBC + HMAC
         }
         if ($cipher === false) {
             throw new \RuntimeException('AES 加密失败');
@@ -105,22 +113,45 @@ class Crypto
     public static function open($payload, $publicKeyPem)
     {
         $bin = self::base64urlDecode($payload);
-        if ($bin === '' || strlen($bin) < 7) {
+        $total = strlen($bin);
+        // 最小长度：1(算法) + 2(密钥长) + 1(IV长) + 1(标签长) + 1 字节密文兜底
+        if ($bin === '' || $total < 7) {
             return '';
         }
         $pos = 0;
         $algo = ord($bin[$pos]); $pos += 1;
 
+        if ($pos + 2 > $total) {
+            return '';
+        }
         $keyLen = unpack('n', substr($bin, $pos, 2))[1]; $pos += 2;
+        if ($keyLen <= 0 || $pos + $keyLen > $total) {
+            return '';
+        }
         $encKey = substr($bin, $pos, $keyLen); $pos += $keyLen;
 
+        if ($pos + 1 > $total) {
+            return '';
+        }
         $ivLen = ord($bin[$pos]); $pos += 1;
+        if ($pos + $ivLen > $total) {
+            return '';
+        }
         $iv = substr($bin, $pos, $ivLen); $pos += $ivLen;
 
+        if ($pos + 1 > $total) {
+            return '';
+        }
         $tagLen = ord($bin[$pos]); $pos += 1;
+        if ($pos + $tagLen > $total) {
+            return '';
+        }
         $tag = substr($bin, $pos, $tagLen); $pos += $tagLen;
 
         $cipher = substr($bin, $pos);
+        if ($cipher === '' || $cipher === false) {
+            return '';
+        }
 
         $publicKey = openssl_pkey_get_public($publicKeyPem);
         if ($publicKey === false) {
@@ -134,6 +165,11 @@ class Crypto
         if ($algo === 1) {
             $plain = openssl_decrypt($cipher, self::AES_METHOD, $aesKey, OPENSSL_RAW_DATA, $iv, $tag);
         } elseif ($algo === 2) {
+            // 先验 HMAC-SHA256(iv||密文)，失败即丢弃，避免填充预言
+            $calc = hash_hmac('sha256', $iv . $cipher, $aesKey, true);
+            if (!hash_equals($calc, $tag)) {
+                return '';
+            }
             $plain = openssl_decrypt($cipher, 'aes-256-cbc', $aesKey, OPENSSL_RAW_DATA, $iv);
         } else {
             return '';
