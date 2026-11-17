@@ -1,6 +1,6 @@
 /* ============================================================
    授权管理系统 样式
-   设计方向：石墨灰阶 + 单一靛蓝强调，安静的工具界面。
+   设计方向：石墨灰阶 + 单一薛蓝强调，安静的工具界面。
    规则：4px 网格、无渐变、无发光、无 emoji、状态用圆点、数字等宽。
    ============================================================ */
 
@@ -15,7 +15,7 @@
     --ink-2: #5b656c;
     --ink-3: #8b959c;
 
-    /* 单一强调色（靛蓝） */
+    /* 单一强调色（薛蓝） */
     --accent: #3457d5;
     --accent-hover: #2c49b8;
     --accent-soft: #eef1fc;
@@ -321,4 +321,92 @@ input[readonly] { background: var(--surface-2); color: var(--ink-2); }
     .content { padding: 20px 16px; }
     .topbar { padding: 0 16px; }
     .form-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   卡密 / 软件下发管理：扩展样式
+   沿用石墨灰阶 + 薛蓝强调，尺寸走 4px 网格
+   ============================================================ */
+
+.head-actions { display: flex; align-items: center; gap: 8px; }
+
+.btn-sm { padding: 4px 10px; font-size: 13px; }
+
+.sync-msg {
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 13px;
+}
+
+.sync-msg-err { border-color: #f0c9c4; background: #fdf3f2; color: var(--bad); }
+
+/* 表格内所属软件 */
+.sw-cell { display: flex; flex-direction: column; gap: 2px; }
+.sw-name { font-weight: 500; }
+.sw-id { font-size: 12px; color: var(--ink-3); }
+
+/* 小标签 */
+.tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 18px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    vertical-align: middle;
+}
+.tag-warn { border-color: #ecd2a8; background: #fdf7ea; color: #8a5a12; }
+.tag-mute { color: var(--ink-3); }
+
+/* 开关行与子面板 */
+.switch-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 8px; }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; user-select: none; }
+.switch input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+.subpanel {
+    margin: 4px 0 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.inline-row { display: flex; align-items: center; gap: 8px; }
+.inline-row input { flex: 1; }
+.chip-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
+/* 可视化 / 源码 切换 */
+.cfg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.tabs { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.tab {
+    border: 0;
+    background: var(--surface);
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+.tab.is-current { background: var(--accent-soft); color: var(--accent-ink); }
+
+.cfg-preview {
+    margin: 8px 0 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 12px;
+    line-height: 1.6;
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
