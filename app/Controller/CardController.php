@@ -47,6 +47,7 @@ class CardController
         Auth::requireLogin();
         View::page('card/form', array(
             'softwares' => SoftwareRepo::enabled(),
+            'preselect' => (int)Util::param('software_id', 0),
             'csrf' => Auth::csrfToken(),
         ), '生成卡密');
     }
@@ -61,13 +62,15 @@ class CardController
             Response::json(1001, '表单已过期');
         }
         try {
+            $softwareId = (int)Util::param('software_id', 0);
             $result = CardService::generate(array(
-                'software_id' => Util::param('software_id', 0),
+                'software_id' => $softwareId,
                 'mode' => Util::param('mode', 'time'),
                 'days' => Util::param('days', 30),
                 'times' => Util::param('times', 100),
                 'count' => Util::param('count', 1),
                 'remark' => Util::param('remark', ''),
+                'custom_config' => $this->buildCustomConfig($softwareId),
             ));
             LogRepo::admin(Auth::id(), Auth::name(), 'card.generate', $result['batch'],
                 array('count' => count($result['cards'])));
@@ -75,6 +78,92 @@ class CardController
         } catch (\Exception $e) {
             Response::json(1001, $e->getMessage());
         }
+    }
+
+    /**
+     * 组装卡专属下发配置：AI 只覆盖已开放字段的值，额外配置按类型写入。
+     * 返回空串表示沿用软件默认配置。
+     * @param int $softwareId 软件 ID
+     * @return string JSON
+     */
+    private function buildCustomConfig($softwareId)
+    {
+        $aiOn = (int)Util::param('ai_enabled', 0) === 1;
+        $extraOn = (int)Util::param('extra_enabled', 0) === 1;
+        if (!$aiOn && !$extraOn) {
+            return '';
+        }
+        $software = SoftwareRepo::find($softwareId);
+        if (!$software) {
+            throw new \RuntimeException('软件不存在');
+        }
+        $base = json_decode($software['default_config'], true);
+        if (!is_array($base)) {
+            $base = array();
+        }
+        $cfg = array();
+
+        if ($aiOn) {
+            // 以软件默认 AI 配置为骨架，只允许改 endpoint / key / model 的值，
+            // 结构与其他固定字段保持不变。
+            $baseAi = isset($base['ai']) && is_array($base['ai']) ? $base['ai'] : array();
+            $endpoint = trim(Util::param('ai_endpoint', ''));
+            $key = trim(Util::param('ai_key', ''));
+            $model = trim(Util::param('ai_model', ''));
+            if ($endpoint !== '') {
+                $baseAi['endpoint'] = $endpoint;
+            }
+            if ($key !== '') {
+                $baseAi['key'] = $key;
+            }
+            if ($model !== '') {
+                $baseAi['model'] = $model;
+            }
+            if (!$baseAi) {
+                throw new \RuntimeException('请至少填写一项 AI 配置');
+            }
+            $cfg['ai'] = $baseAi;
+        }
+
+        if ($extraOn) {
+            $type = Util::param('extra_type', 'text');
+            $content = (string)Util::param('extra_content', '');
+            if ($type === 'json') {
+                $decoded = json_decode($content, true);
+                if (!is_array($decoded)) {
+                    throw new \RuntimeException('额外 JSON 内容格式不正确');
+                }
+                $cfg['json'] = $decoded;
+            } elseif ($type === 'script') {
+                if (trim($content) === '') {
+                    throw new \RuntimeException('脚本 / 配置文件内容不能为空');
+                }
+                $cfg['script'] = $content;
+            } else {
+                if (trim($content) === '') {
+                    throw new \RuntimeException('自定义文本不能为空');
+                }
+                $cfg['text'] = $content;
+            }
+        }
+
+        $json = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            throw new \RuntimeException('配置序列化失败');
+        }
+        return $json;
+    }
+
+    /**
+     * 刷新软件关联信息：统计卡密与软件的关联情况（孤儿卡、停用软件下的卡等）
+     */
+    public function sync()
+    {
+        Auth::requireLogin();
+        if (!Auth::checkCsrf(Util::param('csrf', ''))) {
+            Response::json(1001, '表单已过期');
+        }
+        Response::json(0, '已刷新', CardRepo::linkStats());
     }
 
     /**
