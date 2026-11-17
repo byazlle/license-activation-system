@@ -12,7 +12,7 @@ define('PUBLIC_PATH', __DIR__);
 
 require_once ROOT . '/app/bootstrap.php';
 
-use App\Core\Router;
+use App\Router;
 
 $router = new Router();
 $router->dispatch();
