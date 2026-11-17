@@ -62,18 +62,25 @@ docs/             D1 需求 / D2 架构 / D3 数据字典 / D4 API
 
 ```
 GET/POST index.php?r=api/ping       连通性测试
-POST    index.php?r=api/activate    时效型激活（不扣次）
+POST    index.php?r=api/activate    时效型激活（不扣次，次数卡返回 2003）
+POST    index.php?r=api/status      只读查询授权与配置（不扣次，两种模式通用）
 POST    index.php?r=api/ticket      次数型消费（原子扣 1）
+POST    index.php?r=api/refund      失败退次（需带 ticket，一张票据仅退一次）
 ```
 
-通用参数：`card_id`、`software_id`（软件标识）、`device_id`、`nonce`、`timestamp`。
+也可以走路径式：`http://{host}/api/activate`。全部接口已开启 CORS，浏览器 / WebView 可跨域直连。
+
+通用参数：`card_id`、`software_id`（软件标识，来自 K 码 `s`）、`device_id`、`nonce`、`timestamp`。
 
 客户端解密流程：
 
-1. 用内置**公钥 A** 解 K 码 → 得到 `card_id`、服务器地址、**该软件公钥 B**
-2. 带参数请求 `activate` 或 `ticket`，拿到加密业务包
+1. 用内置**公钥 A** 解 K 码 → 得到 `card_id`、服务器地址 `u`、**该软件公钥 B** `b`、软件标识 `s`
+2. 带参数请求 `status`（只读）或 `ticket`（扣次），拿到加密业务包
 3. 用第 1 步得到的**公钥 B** 解密业务包 → 得到授权与配置
 4. 用配置里的 AI 信息本地直连 AI 接口
+
+> 密文是**带长度前缀的变长结构**（`algo|keyLen|RSA|ivLen|IV|tagLen|tag|cipher`），
+> 不是定长偏移，客户端必须按长度字段解析。详见 D4 §6。
 
 ## 运行环境
 
