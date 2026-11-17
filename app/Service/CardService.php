@@ -63,7 +63,8 @@ class CardService
                     'remain' => $remain,
                     'used' => 0,
                     'status' => 1,
-                    'remark' => isset($p['remark']) ? $p['remark'] : null,
+                    'remark' => isset($p['remark']) && $p['remark'] !== '' ? $p['remark'] : null,
+                    'custom_config' => isset($p['custom_config']) && $p['custom_config'] !== '' ? $p['custom_config'] : null,
                     'batch_no' => $batch,
                 ));
 
