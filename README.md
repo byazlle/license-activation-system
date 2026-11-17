@@ -12,6 +12,8 @@
 - **配置下发**：AI 配置（接口地址 / Key / 模型）、自定义文本、JSON 参数，整体加密下发
 - **地址转换**：换服务器 / 域名时重签 K 码，软件无需重新发布
 - **后台**：安装向导、管理员账号、软件 / 卡密 CRUD、请求日志、统计概览
+- **开放 API**：API Key 鉴权 + scope 权限，软件/卡密/统计/日志/系统全部功能可被 AI 直接调用
+- **一键部署**：宝塔面板部署脚本 + 命令行静默安装器 + 开箱即用发布包
 - **零依赖**：无 Composer、无框架，仅用 PHP 标准扩展
 
 ## 密钥体系
@@ -35,18 +37,22 @@ app/
   bootstrap.php   引导：自动加载、配置、异常处理
   Router.php      路由分发
   Core/           Config / DB / Crypto / Log / Response / Auth / View / Util
-  Controller/     安装、管理员、软件、卡密、日志、API、转换
+  Controller/     安装、管理员、软件、卡密、日志、客户端API、开放API、转换
   Service/        业务逻辑
   Repository/     数据访问
   views/          模板
 config/           配置（安装时生成 config.php）
 keys/             私钥（服务器外置，禁止 Web 访问）
 storage/          日志与会话
-install/          建表脚本与安装锁
-docs/             D1 需求 / D2 架构 / D3 数据字典 / D4 API
+install/          建表脚本、安装锁、命令行静默安装器
+deploy/           宝塔一键部署脚本
+tools/            API 冒烟测试脚本
+docs/             D1 需求 / D2 架构 / D3 数据字典 / D4 客户端API / D5 开放API / 安装教程
 ```
 
 ## 安装
+
+**完整教程见 [docs/INSTALL-安装部署教程.md](docs/INSTALL-安装部署教程.md)（宝塔一键脚本 / 手动上传 / 命令行静默安装）。**
 
 1. 创建 MySQL 数据库（如 `license_db`），字符集 `utf8mb4`。
 2. 把 `public/` 设为站点文档根；`config/`、`keys/`、`app/`、`storage/`、`install/` 放在文档根之外。
@@ -69,6 +75,22 @@ POST    index.php?r=api/refund      失败退次（需带 ticket，一张票据�
 ```
 
 也可以走路径式：`http://{host}/api/activate`。全部接口已开启 CORS，浏览器 / WebView 可跨域直连。
+
+## 开放 API（给 AI / 第三方系统调用）
+
+```
+POST http://{host}/openapi/software/create    新建软件（自动生成密钥对 B）
+POST http://{host}/openapi/software/public-key 下载公钥
+POST http://{host}/openapi/card/generate      发卡，可每张卡单独指定 AI 配置
+POST http://{host}/openapi/card/list          卡密列表（含所属软件）
+POST http://{host}/openapi/stats/overview     统计概览
+POST http://{host}/openapi/admin/list         管理员账号管理
+POST http://{host}/openapi/...                软件/卡密/日志/统计/系统全部功能
+```
+
+鉴权：`Authorization: Bearer lsk_xxx`（也支持 `X-API-Key`）。密钥在后台「API 密钥」页创建，安装时会自动生成一把全权限密钥并写入 `install/initial_api_key.txt`。支持按 scope 最小授权，所有调用写入 `api_call_logs`。
+
+完整接口表、参数、错误码与 AI 工具描述见 [docs/D5-开放API与AI集成文档.md](docs/D5-开放API与AI集成文档.md)。
 
 通用参数：`card_id`、`software_id`（软件标识，来自 K 码 `s`）、`device_id`、`nonce`、`timestamp`。
 
@@ -93,7 +115,9 @@ POST    index.php?r=api/refund      失败退次（需带 ticket，一张票据�
 - [D1 用户需求梳理](docs/D1-用户需求梳理文档.md)
 - [D2 项目技术架构](docs/D2-项目技术架构文档.md)
 - [D3 数据字典](docs/D3-数据字典.md)
-- [D4 API 接口文档](docs/D4-API-接口文档.md)
+- [D4 API 接口文档（客户端）](docs/D4-API-接口文档.md)
+- [D5 开放 API 与 AI 集成文档](docs/D5-开放API与AI集成文档.md)
+- [安装部署教程](docs/INSTALL-安装部署教程.md)
 
 ## 许可
 

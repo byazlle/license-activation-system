@@ -13,7 +13,7 @@ use App\Core\Response;
 class Router
 {
     /** 允许的模块名（用于路径式路由识别） */
-    private static $modules = array('install', 'admin', 'dashboard', 'software', 'card', 'log', 'convert', 'api');
+    private static $modules = array('install', 'admin', 'dashboard', 'software', 'card', 'log', 'convert', 'api', 'openapi');
 
     /**
      * 解析路由：优先取 ?r=模块/方法，其次从 PATH_INFO 推导（如 /api/activate）
@@ -23,7 +23,7 @@ class Router
     {
         $route = Util::param('r', '');
         if ($route !== '') {
-            return preg_replace('/[^a-zA-Z0-9_\/]/', '', $route);
+            return preg_replace('/[^a-zA-Z0-9_\/-]/', '', $route);
         }
         // 路径式：/api/activate、/admin/login
         $path = isset($_SERVER['REQUEST_URI']) ? parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) : '';
@@ -36,6 +36,11 @@ class Router
             return $default;
         }
         $action = isset($segments[1]) && $segments[1] !== '' ? $segments[1] : 'index';
+        // 开放 API 支持三级路径：/openapi/software/list
+        if ($segments[0] === 'openapi' && isset($segments[2]) && $segments[2] !== '') {
+            return 'openapi/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $action)
+                . '/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $segments[2]);
+        }
         return $segments[0] . '/' . $action;
     }
 
@@ -63,15 +68,16 @@ class Router
      */
     private function call($route)
     {
-        $parts = explode('/', $route, 2);
+        $parts = explode('/', $route, 3);
         $module = isset($parts[0]) ? preg_replace('/[^a-zA-Z0-9_]/', '', $parts[0]) : '';
         $action = isset($parts[1]) ? preg_replace('/[^a-zA-Z0-9_]/', '', $parts[1]) : 'index';
+        $op = isset($parts[2]) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $parts[2]) : '';
         if ($module === '' || $action === '') {
             Response::json(1001, '请求路径不合法');
         }
 
-        // 客户端 API 统一输出跨域头，并直接应答浏览器的 OPTIONS 预检
-        if ($module === 'api') {
+        // 客户端 API 与开放 API 统一输出跨域头，并直接应答浏览器的 OPTIONS 预检
+        if ($module === 'api' || $module === 'openapi') {
             Response::cors();
             $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : 'GET';
             if ($method === 'OPTIONS') {
@@ -80,10 +86,17 @@ class Router
             }
         }
 
-        $class = 'App\\Controller\\' . ucfirst($module) . 'Controller';
+        // openapi 的大小写与类名不完全一致，单独映射
+        $classMap = array(
+            'openapi' => 'App\\Controller\\OpenApiController',
+            'api' => 'App\\Controller\\ApiController',
+        );
+        $class = isset($classMap[$module])
+            ? $classMap[$module]
+            : 'App\\Controller\\' . ucfirst($module) . 'Controller';
         if (!class_exists($class)) {
             // 页面请求给 404 文本，API 请求给 JSON
-            if ($module === 'api') {
+            if ($module === 'api' || $module === 'openapi') {
                 Response::json(1001, '接口不存在');
             }
             http_response_code(404);
@@ -93,13 +106,18 @@ class Router
 
         $controller = new $class();
         if (!method_exists($controller, $action)) {
-            if ($module === 'api') {
+            if ($module === 'api' || $module === 'openapi') {
                 Response::json(1001, '接口方法不存在');
             }
             http_response_code(404);
             echo '页面不存在';
             return;
         }
-        $controller->{$action}();
+        if ($module === 'openapi') {
+            // 第三级路径作为方法参数传入，如 openapi/software/list
+            $controller->{$action}($op);
+        } else {
+            $controller->{$action}();
+        }
     }
 }
