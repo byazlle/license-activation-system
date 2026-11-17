@@ -1,0 +1,9 @@
+/config/config.php
+/install/install.lock
+/keys/*.pem
+/storage/logs/*
+/storage/sessions/*
+!/storage/logs/.gitkeep
+!/storage/sessions/.gitkeep
+.DS_Store
+*.swp
