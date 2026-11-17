@@ -32,7 +32,7 @@ class CardRepo
     }
 
     /**
-     * 分页查询卡密
+     * 分页查询卡密（联表软件，返回所属软件名称与标识，供列表展示与筛选）
      * @param array $filter 筛选条件
      * @param int $offset 偏移
      * @param int $limit 每页条数
@@ -43,22 +43,34 @@ class CardRepo
         $where = array('1=1');
         $params = array();
         if (!empty($filter['software_id'])) {
-            $where[] = 'software_id = :software_id';
+            $where[] = 'c.software_id = :software_id';
             $params[':software_id'] = $filter['software_id'];
         }
         if (isset($filter['status']) && $filter['status'] !== '') {
-            $where[] = 'status = :status';
+            $where[] = 'c.status = :status';
             $params[':status'] = $filter['status'];
         }
         if (!empty($filter['keyword'])) {
-            $where[] = '(card_id LIKE :kw OR remark LIKE :kw)';
+            $where[] = '(c.card_id LIKE :kw OR c.remark LIKE :kw)';
             $params[':kw'] = '%' . $filter['keyword'] . '%';
         }
-        $sql = 'SELECT * FROM {cards} WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT :offset,:limit';
+        $sql = 'SELECT c.*,
+                       s.name AS software_name,
+                       s.identifier AS software_identifier,
+                       s.status AS software_status
+                FROM {cards} c
+                LEFT JOIN {softwares} s ON s.id = c.software_id
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY c.id DESC LIMIT :offset,:limit';
+        $sql = str_replace(
+            array('{cards}', '{softwares}'),
+            array(\App\Core\DB::table('cards'), \App\Core\DB::table('softwares')),
+            $sql
+        );
         $params[':offset'] = $offset;
         $params[':limit'] = $limit;
         // PDO 的 LIMIT 参数需绑定为整数
-        $stmt = \App\Core\DB::pdo()->prepare(str_replace('{cards}', \App\Core\DB::table('cards'), $sql));
+        $stmt = \App\Core\DB::pdo()->prepare($sql);
         foreach ($params as $k => $v) {
             $stmt->bindValue($k, $v, is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
@@ -114,6 +126,28 @@ class CardRepo
         ));
     }
 
+    /**
+     * 原子退次：remain+1、used-1，且 remain 不允许超过 total_times。
+     * 返回受影响行数，1 表示退回成功（0 表示已满额或卡状态不符）。
+     * @param string $cardId 卡号
+     * @param int $softwareId 软件 ID
+     * @return int
+     */
+    public static function refundAtomic($cardId, $softwareId)
+    {
+        $sql = 'UPDATE {cards}
+                SET remain = remain + 1,
+                    used = CASE WHEN used > 0 THEN used - 1 ELSE 0 END,
+                    last_used_at = :now
+                WHERE card_id = :card_id AND software_id = :software_id
+                  AND status = 1 AND mode = \'times\' AND remain < total_times';
+        return DB::execute($sql, array(
+            ':now' => time(),
+            ':card_id' => $cardId,
+            ':software_id' => $softwareId,
+        ));
+    }
+
     public static function extend($id, $expireAt)
     {
         return DB::update('cards', array('expire_at' => $expireAt, 'updated_at' => time()), 'id = :id', array(':id' => $id));
@@ -137,6 +171,30 @@ class CardRepo
     public static function delete($id)
     {
         return DB::execute('DELETE FROM {cards} WHERE id = ?', array($id));
+    }
+
+    /**
+     * 软件关联体检：统计卡密与软件的关联情况
+     * @return array
+     */
+    public static function linkStats()
+    {
+        return array(
+            'cards' => (int)DB::value('SELECT COUNT(*) FROM {cards}'),
+            'softwares' => (int)DB::value('SELECT COUNT(*) FROM {softwares}'),
+            'linked' => (int)DB::value(
+                'SELECT COUNT(*) FROM {cards} c INNER JOIN {softwares} s ON s.id = c.software_id'
+            ),
+            'orphan' => (int)DB::value(
+                'SELECT COUNT(*) FROM {cards} c LEFT JOIN {softwares} s ON s.id = c.software_id WHERE s.id IS NULL'
+            ),
+            'disabled_linked' => (int)DB::value(
+                'SELECT COUNT(*) FROM {cards} c INNER JOIN {softwares} s ON s.id = c.software_id WHERE s.status = 0'
+            ),
+            'with_custom' => (int)DB::value(
+                "SELECT COUNT(*) FROM {cards} WHERE custom_config IS NOT NULL AND custom_config <> ''"
+            ),
+        );
     }
 
     /**
