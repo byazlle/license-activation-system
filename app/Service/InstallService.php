@@ -135,7 +135,7 @@ return array(
     ),
     'app' => array(
         'name' => '软件激活与授权管理系统',
-        'ticket_ttl' => 60,
+        'ticket_ttl' => 1800,
         'request_window' => 300,
     ),
 );
