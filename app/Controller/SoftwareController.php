@@ -126,6 +126,110 @@ class SoftwareController
     }
 
     /**
+     * 根据接口地址与 API Key 拉取可选模型列表（服务端代请求 /models）
+     * 兼容 OpenAI 风格 {data:[{id}]} 与部分厂商的 {models:[...]}
+     */
+    public function models()
+    {
+        Auth::requireLogin();
+        if (!Auth::checkCsrf(Util::param('csrf', ''))) {
+            Response::json(1001, '表单已过期');
+        }
+        $endpoint = trim(Util::param('endpoint', ''));
+        $key = trim(Util::param('key', ''));
+        if ($endpoint === '' || $key === '') {
+            Response::json(1001, '请先填写接口地址与 API Key');
+        }
+        $url = self::modelsUrl($endpoint);
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            Response::json(1001, '接口地址必须以 http:// 或 https:// 开头');
+        }
+        if (!function_exists('curl_init')) {
+            Response::json(1001, '服务器未启用 curl 扩展，请手动填写模型名称');
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_HTTPHEADER => array(
+                'Authorization: Bearer ' . $key,
+                'Accept: application/json',
+            ),
+        ));
+        $body = curl_exec($ch);
+        $err = curl_error($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body === false) {
+            Response::json(1001, '请求失败：' . $err);
+        }
+        $json = json_decode($body, true);
+        if (!is_array($json)) {
+            Response::json(1001, '接口返回不是 JSON（HTTP ' . $status . '），可手动填写模型名称');
+        }
+        if (isset($json['error'])) {
+            $msg = is_array($json['error']) && isset($json['error']['message'])
+                ? $json['error']['message'] : '接口返回错误';
+            Response::json(1001, '接口错误：' . $msg);
+        }
+
+        $list = array();
+        if (isset($json['data']) && is_array($json['data'])) {
+            foreach ($json['data'] as $item) {
+                if (is_array($item) && isset($item['id'])) {
+                    $list[] = (string)$item['id'];
+                } elseif (is_string($item)) {
+                    $list[] = $item;
+                }
+            }
+        } elseif (isset($json['models']) && is_array($json['models'])) {
+            foreach ($json['models'] as $item) {
+                if (is_array($item)) {
+                    if (isset($item['name'])) {
+                        $list[] = (string)$item['name'];
+                    } elseif (isset($item['model'])) {
+                        $list[] = (string)$item['model'];
+                    }
+                } elseif (is_string($item)) {
+                    $list[] = $item;
+                }
+            }
+        }
+        $list = array_values(array_unique(array_filter($list)));
+        sort($list);
+        if (!$list) {
+            Response::json(1001, '未获取到模型列表，请手动填写');
+        }
+        Response::json(0, '已获取 ' . count($list) . ' 个模型', array('models' => $list, 'url' => $url));
+    }
+
+    /**
+     * 把对话接口地址归一化为模型列表地址
+     * https://api.x.com/v1/chat/completions -> https://api.x.com/v1/models
+     * @param string $endpoint 接口地址
+     * @return string
+     */
+    private static function modelsUrl($endpoint)
+    {
+        $u = rtrim($endpoint, '/');
+        foreach (array('/chat/completions', '/completions', '/messages', '/responses') as $suffix) {
+            if (substr($u, -strlen($suffix)) === $suffix) {
+                $u = substr($u, 0, -strlen($suffix));
+                break;
+            }
+        }
+        if (substr($u, -7) === '/models') {
+            return $u;
+        }
+        return $u . '/models';
+    }
+
+    /**
      * 下载全局公钥 A（所有软件内置）
      */
     public function publicA()
